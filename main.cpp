@@ -6,6 +6,7 @@
 #include <dxgi1_6.h>
 #include <cassert>
 
+
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 
@@ -238,13 +239,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	assert(SUCCEEDED(hr));
 
 	//ディスクリプタヒープの生成
-	ID3D12DescriptorHeap* rtvDesctiptorHeap = nullptr;
+	ID3D12DescriptorHeap* rtvDescriptorHeap = nullptr;
 	D3D12_DESCRIPTOR_HEAP_DESC rtvDesctiptorHeapDesc{};
 	rtvDesctiptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	rtvDesctiptorHeapDesc.NumDescriptors = 2;
 	hr = device->CreateDescriptorHeap
 	(
-		&rtvDesctiptorHeapDesc, IID_PPV_ARGS(&rtvDesctiptorHeap)
+		&rtvDesctiptorHeapDesc, IID_PPV_ARGS(&rtvDescriptorHeap)
 	);
 	//ディスクリプタヒープが作れなかったので起動できない
 	assert(SUCCEEDED(hr));
@@ -263,7 +264,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 	//ディスクリプタの先端を取得する
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvStartHandle =
-		rtvDesctiptorHeap->GetCPUDescriptorHandleForHeapStart();
+		rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 	//RTVを2つ作るのでディスクリプタを2つ用意
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[2];
 	//まず1つ目を作る。1つ目は最初のところに作る。作る場所をこちらで指定してあげる必要がある
@@ -274,6 +275,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	//2つ目を作る
 	device->CreateRenderTargetView(swapChainResources[1], &rtvDesc, rtvHandles[1]);
+
+	// 初期化θでFenceを作る
+	ID3D12Fence* fence = nullptr;
+	uint64_t fenceValue = 0;
+	hr = device->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE,
+		IID_PPV_ARGS(&fence));
+	assert(SUCCEEDED(hr));
+
+	// FenceのSignalを待つためのイベントを作成する
+	HANDLE fenceEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+	assert(fenceEvent != nullptr);
 
 	MSG msg{};
 	//ウィンドウの×ボタンが押されるまでループ
@@ -291,11 +303,34 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 		//これからもよろしくお願いします。
 		UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
+
+		// TransitionBarrierの設定
+		D3D12_RESOURCE_BARRIER barrier{};
+		// 今回のバリアはTransition
+		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		// Noneにしておく
+		barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		// バリアを張る対象のリソース。現在のバックバッファに対して行う
+		barrier.Transition.pResource = swapChainResources[backBufferIndex];
+		// 遷移前（現在）のResourceState
+		barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+		// 遷移後のResourceState
+		barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		// TransitionBarrierを張る
+		commandList->ResourceBarrier(1, &barrier);
+
 		//描画先のRTVを設定する
 		commandList->OMSetRenderTargets(1, &rtvHandles[backBufferIndex], false, nullptr);
 		//指定した色で画面全体をクリアする
 		float clearColor[] = { 0.1f,0.25f,0.5f,1.0f };
 		commandList->ClearRenderTargetView(rtvHandles[backBufferIndex], clearColor, 0, nullptr);
+
+		// 今回はRenderTargetからPresentにする
+		barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+		// TransitionBarrierを張る
+		commandList->ResourceBarrier(1, &barrier);
+
 		//コマンドリストの内容を確定させる。すべてのコマンドを積んでからCloseすること
 		hr = commandList->Close();
 		assert(SUCCEEDED(hr));
@@ -305,11 +340,30 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		commandQueue->ExecuteCommandLists(1, commandLists);
 		//GPUとOSに画面の交換を行うよう追加する
 		swapChain->Present(1, 0);
+
+		// Fenceの値を更新
+		fenceValue++;
+
+		// GPUがここまでたどり着いたときに、
+		// Fenceの値を指定した値に代入するようにSignalを送る
+		commandQueue->Signal(fence, fenceValue);
+
+		// Fenceの値が指定したSignal値にたどり着いているか確認する
+		// GetCompletdValueの初期化はFence作成時に渡した初期値
+		if (fence->GetCompletedValue() < fenceValue) {
+			// 指定したSignalにたどり着いいていないので、
+			// たどり着くまで待つようにイベントを設定する
+			fence->SetEventOnCompletion(fenceValue, fenceEvent);
+			// イベントを待つ
+			WaitForSingleObject(fenceEvent, INFINITE);
+		}
+
 		//次のフレーム用のコマンドリストを準備
 		hr = commandAllocator->Reset();
 		assert(SUCCEEDED(hr));
 		hr = commandList->Reset(commandAllocator, nullptr);
 		assert(SUCCEEDED(hr));
+
 #ifdef _DEBUG
 		ID3D12InfoQueue* infoQueue = nullptr;
 		if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&infoQueue)))) {
@@ -317,8 +371,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
 			// エラー時に止まる
 			infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
-			// 警告時に止まる
-			infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
 
 			// 抑制するメッセージのID
 			D3D12_MESSAGE_ID denyIds[] = {
@@ -343,6 +395,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 
 	}
+
 
 
 
