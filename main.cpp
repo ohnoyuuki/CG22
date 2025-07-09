@@ -647,20 +647,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     ////////////////////////koko
 
-    // RootSignature作成。複数設定できるので配列。今回は結果1つだけなので長さ1の配列
+    // RootParameter作成。複数設定できるので配列。今回は結果1つだけなので長さ1の配列
     D3D12_ROOT_PARAMETER rootParameters[2] = {};
     rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; // CBVを使う
-    rootParameters[0].ShaderVisibility =
-        D3D12_SHADER_VISIBILITY_PIXEL;                 // PixelShaderで使う
+    rootParameters[0].ShaderVisibility =D3D12_SHADER_VISIBILITY_PIXEL;                 // PixelShaderで使う
     rootParameters[0].Descriptor.ShaderRegister = 0; // レジスタ番号0とバインド
     rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; // CBVを使う
-    rootParameters[1].ShaderVisibility =
-        D3D12_SHADER_VISIBILITY_VERTEX;              // VertexShaderで使う
+    rootParameters[1].ShaderVisibility =D3D12_SHADER_VISIBILITY_VERTEX;              // VertexShaderで使う
     rootParameters[1].Descriptor.ShaderRegister = 0; // レジスタ番号0を使う
-    descriptionRootSignature.pParameters =
-        rootParameters; // ルートレートパラメータ配列へのポインタ
-    descriptionRootSignature.NumParameters =
-        _countof(rootParameters); // 配列の長さ
+    descriptionRootSignature.pParameters = rootParameters; // ルートレートパラメータ配列へのポインタ
+    descriptionRootSignature.NumParameters =_countof(rootParameters); // 配列の長さ
 
     // シリアライズしてバイナリにする
     ID3DBlob* signatureBlob = nullptr;
@@ -814,20 +810,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             // ゲームの処理
 
             transform.rotate.y += 0.03f;
-            /*Matrix4x4 worldMatrix = MakeAffineMatrix(
-                transform.scale, transform.rotate, transform.translate);
-              *wvpData = worldMatrix;*/
-
-            Matrix4x4 worldMatrix = MakeAffineMatrix(
-                transform.scale, transform.rotate, transform.translate);
-            Matrix4x4 cameraMatrix =
-                MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate,
-                    cameraTransform.translate);
+           
+            Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+            Matrix4x4 cameraMatrix = MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate,cameraTransform.translate);
             Matrix4x4 viewMatrix = Inverse(cameraMatrix);
-            Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(
-                0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
-            Matrix4x4 worldViewProjectionMatrix =
-                Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
+            Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
+            Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
             *wvpData = worldViewProjectionMatrix;
 
 
@@ -868,8 +856,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
                 0, materialResource->GetGPUVirtualAddress());
 
             // wvp用のCBufferの場所を設定
-            commandList->SetGraphicsRootConstantBufferView(
-                1, wvpResource->GetGPUVirtualAddress());
+            commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 
             // 描画！(DrawCall/ドローコール)。3頂点で1つのインスタンス。
             commandList->DrawInstanced(3, 1, 0, 0);
@@ -972,12 +959,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     }
     rootSignature->Release();
     pixelShaderBlob->Release();
-    vertexShaderBlob->Release();
+
+    wvpResource->Release();
+
     materialResource->Release();
+    vertexShaderBlob->Release();
 
     // リソースリークチェック
     IDXGIDebug1* debug;
-    if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug)))) {
+    if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug))))
+    {
         debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
         debug->ReportLiveObjects(DXGI_DEBUG_APP, DXGI_DEBUG_RLO_ALL);
         debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
