@@ -29,15 +29,28 @@ struct Vector4
 	float z;
 	float w;
 };
-
-struct Matrix4x4 {
-	float m[4][4];
-};
-
-struct Vector3 {
+struct Vector3 
+{
 	float x;
 	float y;
 	float z;
+};
+
+struct Vector2
+{
+	float x;
+	float y;
+};
+
+struct VertexData
+{
+	Vector4 position;
+	Vector2 texcoord;
+};
+
+struct Matrix4x4
+{
+	float m[4][4];
 };
 
 struct Transform {
@@ -316,6 +329,30 @@ ID3D12DescriptorHeap* CreateDescriptorHeap(
 
 }
 
+std::wstring ConvertString(const std::string& str)
+{
+	if (str.empty())
+	{
+		return std::wstring();
+	}
+	auto sizeNeebed =
+		MultiByteToWideChar
+		(
+			CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]),
+			static_cast<int>(str.size()), NULL, 0
+		);
+	if (sizeNeebed == 0)
+	{
+		return std::wstring();
+	}
+	std::wstring result(sizeNeebed, 0);
+	MultiByteToWideChar
+	(
+		CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]),
+		static_cast<int>(str.size()), &result[0], sizeNeebed
+	);
+	return result;
+}
 
 //１Textureデータを読む
 DirectX::ScratchImage LoadTexture(const std::string& filePath)
@@ -366,6 +403,27 @@ ID3D12Resource* CreateTextureResource(ID3D12Device* device,const DirectX::TexMet
 }
 
 //３TextureResourceにデータを転送する
+void UploadTextureData(ID3D12Resource* texture, const DirectX::ScratchImage& mipImages)
+{
+	//Meta情報を取得
+	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
+	//全MipMapについて
+	for(size_t mipLevel = 0; mipLevel < metadata.mipLevels; ++mipLevel)
+	{
+	//MipMapLevelを指定して各Imageを取得
+		const DirectX::Image* img = mipImages.GetImage(mipLevel, 0, 0);
+		//Textureに転送
+		HRESULT hr = texture->WriteToSubresource
+		(
+			UINT(mipLevel),
+			nullptr,             //全領域へコピー
+			img->pixels,         // 元データアドレス
+			UINT(img->rowPitch), //１ラインサイズ
+			UINT(img->slicePitch)//１枚サイズ
+		);
+		assert(SUCCEEDED(hr));
+	}
+}
 
 
 //ウィンドウプロシージャ
@@ -394,30 +452,7 @@ void Log(const std::string& message)
 }
 
 //string->wstring
-std::wstring ConvertString(const std::string& str)
-{
-	if (str.empty())
-	{
-		return std::wstring();
-	}
-	auto sizeNeebed =
-		MultiByteToWideChar
-		(
-			CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]),
-			static_cast<int>(str.size()), NULL, 0
-		);
-	if (sizeNeebed == 0)
-	{
-		return std::wstring();
-	}
-	std::wstring result(sizeNeebed, 0);
-	MultiByteToWideChar
-	(
-		CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]),
-		static_cast<int>(str.size()), &result[0], sizeNeebed
-	);
-	return result;
-}
+
 
 
 //wstring->string
@@ -805,11 +840,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	assert(SUCCEEDED(hr));
 
 	//InputLayout
-	D3D12_INPUT_ELEMENT_DESC inputElementDescs[1] = {};
+	D3D12_INPUT_ELEMENT_DESC inputElementDescs[2] = {};
 	inputElementDescs[0].SemanticName = "POSITION";
 	inputElementDescs[0].SemanticIndex = 0;
 	inputElementDescs[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
 	inputElementDescs[0].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+	inputElementDescs[1].SemanticName = "TEXCOORD";
+	inputElementDescs[1].SemanticIndex = 0;
+	inputElementDescs[1].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+	inputElementDescs[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+
 	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc{};
 	inputLayoutDesc.pInputElementDescs = inputElementDescs;
 	inputLayoutDesc.NumElements = _countof(inputElementDescs);
@@ -864,31 +904,32 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		IID_PPV_ARGS(&graphicsPipelineState));
 	assert(SUCCEEDED(hr));
 
-	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(Vector4) * 3);
-
+	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(VertexData) * 3);
 
 	//頂点バッファビューを作成する
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
 	//リソースの先頭のアドレスから使う
 	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
 	//使用するリソースのサイズは頂点３つ分のサイズ
-	vertexBufferView.SizeInBytes = sizeof(Vector4) * 3;
+	vertexBufferView.SizeInBytes = sizeof(VertexData) * 3;
 	//１頂点あたりのサイズ
-	vertexBufferView.StrideInBytes = sizeof(Vector4);
+	vertexBufferView.StrideInBytes = sizeof(VertexData);
 
 
 
 	//頂点リソースにデータを書き込む
-	Vector4* vertexData = nullptr;
+	VertexData* vertexData = nullptr;
 	//書き込むためのアドレスを取得
 	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
 	//左下
 	vertexData[0] = { -0.5f,-0.5f,0.0f,1.0f };
+	vertexData[0].texcoord = { 0.0f,1.0f };
 	//上
 	vertexData[1] = { 0.0f,0.5f,0.0f,1.0f };
+	vertexData[1].texcoord = { 0.5f,0.0f };
 	//右下
 	vertexData[2] = { 0.5f,-0.5f,0.0f,1.0f };
-
+	vertexData[2].texcoord = { 1.0f,1.0f };
 
 
 	//ビューボート
@@ -953,8 +994,27 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
 		srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
+	//Textueを読んで転送する
+	DirectX::ScratchImage mipImages = LoadTexture("resources/uvChecker.png");
+	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
+	ID3D12Resource* textureResource = CreateTextureResource(device, metadata);
+	UploadTextureData(textureResource, mipImages);
 
+	//metaDataを基にSRVの設定
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+	srvDesc.Format = metadata.format;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;//２Dテクスチャ
+	srvDesc.Texture2D.MipLevels = UINT(metadata.mipLevels);
 
+	//SRVを作成するDescriptorHeapの場所を決める
+	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU = srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU = srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+	//先頭はImGuiが使っているのでその次を使う
+	textureSrvHandleCPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	textureSrvHandleGPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	//SRVの生成
+	device->CreateShaderResourceView(textureResource, &srvDesc, textureSrvHandleCPU);
 
 	MSG msg{};
 	//ウィンドウの×ボタンが押されるまでループ
@@ -1127,6 +1187,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	}
 
 	CloseHandle(fenceEvent);
+
+	textureResource->Release();
 
 	//ImGuiの終了処理。詳細はさして重要ではないので解説は省略する。
 	//こういうもんである。初期化と逆順に行う
