@@ -1138,7 +1138,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//頂点バッファビューを作成する
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSprite{};
 	//リソースの先頭のアドレスから使う
-	vertexBufferViewSprite.BufferLocation = vertexResource->GetGPUVirtualAddress();
+	vertexBufferViewSprite.BufferLocation = vertexResourceSprite->GetGPUVirtualAddress();
 	//使用するリソースのサイズは頂点６つ分のサイズ
 	vertexBufferViewSprite.SizeInBytes = sizeof(VertexData) * 6;
 	//１頂点あたりのサイズ
