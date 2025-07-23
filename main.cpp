@@ -29,7 +29,7 @@ struct Vector4
 	float z;
 	float w;
 };
-struct Vector3 
+struct Vector3
 {
 	float x;
 	float y;
@@ -369,7 +369,7 @@ std::wstring ConvertString(const std::string& str)
 //１Textureデータを読む
 DirectX::ScratchImage LoadTexture(const std::string& filePath)
 {
-//テクスチャファイルを読んでプログラムで扱えるようにする
+	//テクスチャファイルを読んでプログラムで扱えるようにする
 	DirectX::ScratchImage image{};
 	std::wstring filePathW = ConvertString(filePath);
 	HRESULT hr = DirectX::LoadFromWICFile(filePathW.c_str(), DirectX::WIC_FLAGS_FORCE_RGB, nullptr, image);
@@ -385,7 +385,7 @@ DirectX::ScratchImage LoadTexture(const std::string& filePath)
 }
 
 //２DirectX12のTextureResourceを作る
-ID3D12Resource* CreateTextureResource(ID3D12Device* device,const DirectX::TexMetadata&metadata)
+ID3D12Resource* CreateTextureResource(ID3D12Device* device, const DirectX::TexMetadata& metadata)
 {
 	//１.metadataを基にResorceの設定
 	D3D12_RESOURCE_DESC resourceDesc{};
@@ -410,8 +410,8 @@ ID3D12Resource* CreateTextureResource(ID3D12Device* device,const DirectX::TexMet
 		D3D12_RESOURCE_STATE_GENERIC_READ,//初回のResourceState。Textureは基本読むだけ
 		nullptr,//Clear最適値。使わないのでnullptr
 		IID_PPV_ARGS(&resource));//作成するResourceポインタへのポインタ
-	    assert(SUCCEEDED(hr));
-		return resource;
+	assert(SUCCEEDED(hr));
+	return resource;
 }
 
 //３TextureResourceにデータを転送する
@@ -420,9 +420,9 @@ void UploadTextureData(ID3D12Resource* texture, const DirectX::ScratchImage& mip
 	//Meta情報を取得
 	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
 	//全MipMapについて
-	for(size_t mipLevel = 0; mipLevel < metadata.mipLevels; ++mipLevel)
+	for (size_t mipLevel = 0; mipLevel < metadata.mipLevels; ++mipLevel)
 	{
-	//MipMapLevelを指定して各Imageを取得
+		//MipMapLevelを指定して各Imageを取得
 		const DirectX::Image* img = mipImages.GetImage(mipLevel, 0, 0);
 		//Textureに転送
 		HRESULT hr = texture->WriteToSubresource
@@ -495,7 +495,7 @@ std::string ConvertString(const std::wstring& str)
 
 
 //DepthStencilTextureを作る
-ID3D12Resource* CreateDepthStencilTextureResource(ID3D12Device* device, int32_t width,int32_t height)
+ID3D12Resource* CreateDepthStencilTextureResource(ID3D12Device* device, int32_t width, int32_t height)
 {
 	//生成するResourceの設定
 	D3D12_RESOURCE_DESC resourceDesc{};
@@ -528,7 +528,7 @@ ID3D12Resource* CreateDepthStencilTextureResource(ID3D12Device* device, int32_t 
 		IID_PPV_ARGS(&resource));
 	assert(SUCCEEDED(hr));
 	return resource;
-	
+
 }
 
 
@@ -1082,7 +1082,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	Transform cameraTransform{
 		{1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -5.0f} };
 
-	
+
 	//ImGuiの初期化。詳細はさして重要ではないので解説は省略する。
 	//こういうもんである
 	IMGUI_CHECKVERSION();
@@ -1139,7 +1139,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//リソースの先頭のアドレスから使う
 	vertexBufferViewSprite.BufferLocation = vertexResourceSprite->GetGPUVirtualAddress();
 	//使用するリソースのサイズは頂点６つ分のサイズ
-	vertexBufferViewSprite.SizeInBytes = sizeof(VertexData) * 6;
+	vertexBufferViewSprite.SizeInBytes = sizeof(VertexData) * 4;
 	//１頂点あたりのサイズ
 	vertexBufferViewSprite.StrideInBytes = sizeof(VertexData);
 
@@ -1152,13 +1152,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	vertexDataSprite[1].texcoord = { 0.0f,0.0f };
 	vertexDataSprite[2].position = { 640.0f,360.0f,0.0f,1.0f };//右下
 	vertexDataSprite[2].texcoord = { 1.0f,1.0f };
+	vertexDataSprite[3].position = { 640.0f,0.0f,0.0f,1.0f };//右上
+	vertexDataSprite[3].texcoord = { 1.0f,0.0f };
 	//２枚目の三角形
-	vertexDataSprite[3].position = { 0.0f,0.0f,0.0f,1.0f };//左上
-	vertexDataSprite[3].texcoord = { 0.0f,0.0f };
-	vertexDataSprite[4].position = { 640.0f,0.0f,0.0f,1.0f };//右上
-	vertexDataSprite[4].texcoord = { 1.0f,0.0f };
-	vertexDataSprite[5].position = { 640.0f,360.0f,0.0f,1.0f };//右下
-	vertexDataSprite[5].texcoord = { 1.0f,1.0f };
+	//vertexDataSprite[3].position = { 0.0f,0.0f,0.0f,1.0f };//左上
+	//vertexDataSprite[3].texcoord = { 0.0f,0.0f };
+	//vertexDataSprite[5].position = { 640.0f,360.0f,0.0f,1.0f };//右下
+	//vertexDataSprite[5].texcoord = { 1.0f,1.0f };
 
 	//Sparite用のTransformationMatrix用のリソースを作る。Matrix4x4 １つ分のサイズを用意する
 	ID3D12Resource* transformtionMatirxResourceSprite = CreateBufferResource(device, sizeof(Matrix4x4));
@@ -1172,6 +1172,23 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//CPUで動かす用のTransformを作る
 	Transform transformSprite{ {1.0f,1.0f,1.0f},{ 0.0f,0.0f,0.0f },{0.0f,0.0f,0.0f} };
 
+	//頂点インデックス
+	ID3D12Resource* indexResourceSprite = CreateBufferResource(device, sizeof(uint32_t) * 6);
+
+	D3D12_INDEX_BUFFER_VIEW indexBufferViewSprite{};
+	//リソースの先頭のアドレスから使う
+	indexBufferViewSprite.BufferLocation = indexResourceSprite->GetGPUVirtualAddress();
+	//使用するリソースのサイズはインデックス６つ分のサイズ
+	indexBufferViewSprite.SizeInBytes = sizeof(uint32_t) * 6;
+	//インデックスはuint32_tとする
+	indexBufferViewSprite.Format = DXGI_FORMAT_R32_UINT;
+
+	//インデックスリソースにデータを書き込む
+	uint32_t* indexDataSprite = nullptr;
+	indexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&indexDataSprite));
+	indexDataSprite[0] = 0; indexDataSprite[1] = 1; indexDataSprite[2] = 2;
+	indexDataSprite[3] = 1; indexDataSprite[4] = 3; indexDataSprite[5] = 2;
+ 
 
 	//------------------------------------------------------------------------------------------------------------------------------
 
@@ -1201,7 +1218,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			ImGui::NewFrame();
 
 
-			
+
 			transform.rotate.y += 0.03f;
 			Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 			Matrix4x4 cameraMatrix = MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
@@ -1221,7 +1238,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			ImGui::Render();
 
 			//更新処理をかく
-	        //これからもよろしくお願いします。
+			//これからもよろしくお願いします。
 			UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
 
 			// TransitionBarrierの設定
@@ -1274,6 +1291,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//SRVのDescriptorTableの先頭を設定。２はrootParameter[2]である。
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 
+			//インデックスを指定
+			commandList->IASetIndexBuffer(&indexBufferViewSprite);//IBNを設定
 
 			//描画!(DrawCall/ドローコル）。３頂点で一つのインスタンス。インスタンスについては今後
 			commandList->DrawInstanced(6, 1, 0, 0);
@@ -1286,7 +1305,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//TransformationMatrixCBufferの場所を設定
 			commandList->SetGraphicsRootConstantBufferView(1, transformtionMatirxResourceSprite->GetGPUVirtualAddress());
 			//描画！（DrawInstanced(DrawCall/ドローコル）
-			commandList->DrawInstanced(6, 1, 0, 0);
+			//commandList->DrawInstanced(6, 1, 0, 0);
+
+			//描画!(DrawCall/ドローコル）６個のインデックスを使用し１つのインスタンスを描画。その他は当面０で良い
+			commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 
 
@@ -1373,7 +1395,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	CloseHandle(fenceEvent);
 
-	
+
 
 	//ImGuiの終了処理。詳細はさして重要ではないので解説は省略する。
 	//こういうもんである。初期化と逆順に行う
@@ -1381,6 +1403,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
 
+
+	indexResourceSprite->Release();
 	dsvDescriptorHeap->Release();
 	depthStencilResource->Release();
 
