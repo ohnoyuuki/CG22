@@ -454,6 +454,39 @@ void UploadTextureData(ID3D12Resource* texture, const DirectX::ScratchImage& mip
 	}
 }
 
+//MaterialData読み込み関数
+MaterialData LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename)
+{
+	//１．中で必要となる変数の宣言
+	MaterialData materialData;//構築するMaterialData
+	std::string line;//ファイルから読んだ１行を格納するもの
+
+	//２．ファイルを開く
+	std::ifstream file(directoryPath + "/" + filename);//ファイルを開く
+	assert(file.is_open());//とりあえず開けなかったら止める
+
+	//３．実際にファイルを読み、MaterialDataを構築していく
+	while (std::getline(file, line))
+	{
+		std::string identifier;
+		std::istringstream s(line);
+		s >> identifier;
+
+		//identifierに応じた処理
+		if (identifier == "map_Kd")
+		{
+			std::string textureFilename;
+			s >> textureFilename;
+			//連結してファイルパスにする
+			materialData.textureFilePath = directoryPath + "/" + textureFilename;
+		}
+
+	}
+	//４．MaterialDataを返す
+	return materialData;
+}
+
+
 //OBj読み込み関数
 ModelData LoadObjFile(const std::string& directoryPath, const std::string&filename)
 {
@@ -506,6 +539,8 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string&filena
 				Vector4 position = positions[elementIndices[0] - 1];
 				position.x *= -1.0f;
 				Vector2 texcoord = texcoords[elementIndices[1] - 1];
+				texcoord.y = 1.0f - texcoord.y;
+
 				Vector3 normal = normals[elementIndices[2] - 1];
 				//normal.x *= -1.0f;
 				//VertexData vertex = { position,texcoord};
@@ -518,6 +553,14 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string&filena
 			modelData.vertices.push_back(triangle[2]);
 			modelData.vertices.push_back(triangle[1]);
 			modelData.vertices.push_back(triangle[0]);
+		}else if(identifier == "mtllib")
+		{
+			//materialTemplateLibraryファイルの名前を取得する
+			std::string materialFilename;
+			s >> materialFilename;
+			//基本的にobjファイルと同一階層にmtlは存在させるので、デイレクトリ名とファイル名を渡す
+			modelData.material = LoadMaterialTemplateFile(directoryPath, materialFilename);
+		
 		}
 
 	}
@@ -526,37 +569,6 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string&filena
 	return modelData;
 }
 
-//MaterialData読み込み関数
-MaterialData LoatMaterialTemplateFile(const std::string& directoryPath,const std::string&filename)
-{
-	//１．中で必要となる変数の宣言
-	MaterialData materialData;//構築するMaterialData
-	std::string line;//ファイルから読んだ１行を格納するもの
-	
-	//２．ファイルを開く
-	std::ifstream file(directoryPath + "/" + filename);//ファイルを開く
-	assert(file.is_open());//とりあえず開けなかったら止める
-
-	//３．実際にファイルを読み、MaterialDataを構築していく
-	while(std::getline(file,line))
-	{
-		std::string identifier;
-		std::istringstream s(line);
-		s >> identifier;
-
-		//identifierに応じた処理
-		if(identifier == "map_Kd")
-		{
-			std::string textureFilename;
-			s >> textureFilename;
-			//連結してファイルパスにする
-			materialData.textureFilePath = directoryPath + "/" + textureFilename;
-		}
-
-	}
-	//４．MaterialDataを返す
-	return materialData;
-}
 
 
 //ウィンドウプロシージャ
@@ -1165,7 +1177,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	*/
 
 	//モデル読み込み
-	ModelData modelData = LoadObjFile("resources", "plane.obj");
+	//ModelData modelData = LoadObjFile("resources", "plane.obj");
+	ModelData modelData = LoadObjFile("resources", "axis.obj");
+
 	//頂点リソースを作る
 	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(VertexData) * modelData.vertices.size());
 	//頂点バッファビューを作成する
@@ -1223,7 +1237,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	Transform transform{
 	  {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 	Transform cameraTransform{
-		{1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -5.0f} };
+		{1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -15.0f} };
 
 
 	//ImGuiの初期化。詳細はさして重要ではないので解説は省略する。
@@ -1240,7 +1254,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
 	//Textueを読んで転送する
-	DirectX::ScratchImage mipImages = LoadTexture("resources/uvChecker.png");
+	//DirectX::ScratchImage mipImages = LoadTexture("resources/uvChecker.png");
+	DirectX::ScratchImage mipImages = LoadTexture(modelData.material.textureFilePath);
 	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
 	ID3D12Resource* textureResource = CreateTextureResource(device, metadata);
 	UploadTextureData(textureResource, mipImages);
@@ -1449,15 +1464,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 			//--------------------------------------
 
-			//Spriteの描画。変更が必要なものだけ変更
-			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
-			//TransformationMatrixCBufferの場所を設定
-			commandList->SetGraphicsRootConstantBufferView(1, transformtionMatirxResourceSprite->GetGPUVirtualAddress());
-			//描画！（DrawInstanced(DrawCall/ドローコル）
-			//commandList->DrawInstanced(6, 1, 0, 0);
-
-			//描画!(DrawCall/ドローコル）６個のインデックスを使用し１つのインスタンスを描画。その他は当面０で良い
-			commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+			////Spriteの描画。変更が必要なものだけ変更
+			//commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
+			////TransformationMatrixCBufferの場所を設定
+			//commandList->SetGraphicsRootConstantBufferView(1, transformtionMatirxResourceSprite->GetGPUVirtualAddress());
+			////描画！（DrawInstanced(DrawCall/ドローコル）
+			////commandList->DrawInstanced(6, 1, 0, 0);
+			////描画!(DrawCall/ドローコル）６個のインデックスを使用し１つのインスタンスを描画。その他は当面０で良い
+			//commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 
 
