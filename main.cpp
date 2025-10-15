@@ -1578,10 +1578,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//マテリアルCBufferの場所を設定
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 			// wvp用のCBufferの場所を設定
-			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
+			//commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 
 			//instancing用のDataを読むためにStructuredBufferのSRVを設定する
-			commandList.setGraphicsRootDescriptorTable(1, );
+			commandList->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);
 
 			//SRVのDescriptorTableの先頭を設定。２はrootParameter[2]である。
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
@@ -1593,18 +1593,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//commandList->DrawInstanced(6, 1, 0, 0);
 
 			//モデル描画
-			commandList->DrawInstanced(UINT(modelData.vertices.size()), 10, 0, 0);
+			commandList->DrawInstanced(UINT(modelData.vertices.size()), kNumInstance, 0, 0);
 
 			//--------------------------------------
 
-			////Spriteの描画。変更が必要なものだけ変更
-			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
-			////TransformationMatrixCBufferの場所を設定
-			commandList->SetGraphicsRootConstantBufferView(1, transformtionMatirxResourceSprite->GetGPUVirtualAddress());
-			////描画！（DrawInstanced(DrawCall/ドローコル）
-			commandList->DrawInstanced(6, 1, 0, 0);
-			////描画!(DrawCall/ドローコル）６個のインデックスを使用し１つのインスタンスを描画。その他は当面０で良い
-			commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+			//////Spriteの描画。変更が必要なものだけ変更
+			//commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
+			//////TransformationMatrixCBufferの場所を設定
+			//commandList->SetGraphicsRootConstantBufferView(1, transformtionMatirxResourceSprite->GetGPUVirtualAddress());
+			//////描画！（DrawInstanced(DrawCall/ドローコル）
+			//commandList->DrawInstanced(6, 1, 0, 0);
+			//////描画!(DrawCall/ドローコル）６個のインデックスを使用し１つのインスタンスを描画。その他は当面０で良い
+			//commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 
 
