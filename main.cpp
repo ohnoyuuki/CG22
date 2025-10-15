@@ -1581,7 +1581,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 
 			//instancing用のDataを読むためにStructuredBufferのSRVを設定する
-			commandList.setGraphicsRootDescriptorTable(1,)
+			commandList.setGraphicsRootDescriptorTable(1, );
 
 			//SRVのDescriptorTableの先頭を設定。２はrootParameter[2]である。
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
