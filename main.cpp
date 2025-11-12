@@ -82,6 +82,26 @@ struct ModelData
 
 };
 
+//Particle構造体
+struct Particle {
+	Transform transform;
+	Vector3 velocity;
+
+};
+
+//Vector３の掛け算
+Vector3& operator*=(Vector3& v, float s) {
+	v.x *= s;
+	v.y *= s;
+	v.z *= s;
+	return v;
+}
+
+const Vector3 operator*(const Vector3& v, float s) {
+	Vector3 temp(v);
+	return temp *=s;
+
+}
 
 // 単位行列
 Matrix4x4 MakeIdentity4x4() {
@@ -1423,13 +1443,26 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//書き込むためのアドレスを取得
 	TransformationMatrix* instancingData = nullptr;
 	instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&instancingData));
+	////単位行列を書きこんでおく
+	//for(uint32_t index = 0; index < kNumInstance; ++index){
+	//	instancingData[index].WVP = MakeIdentity4x4();
+	//	instancingData[index].World = MakeIdentity4x4();
+
+	//}
+
+	Particle particles[kNumInstance];
+
 	//単位行列を書きこんでおく
-	for(uint32_t index = 0; index < kNumInstance; ++index){
+	for (uint32_t index = 0; index < kNumInstance; ++index) {
 		instancingData[index].WVP = MakeIdentity4x4();
 		instancingData[index].World = MakeIdentity4x4();
+		//速度を上向きに設定
+		particles[index].velocity = { 0.0f,1.0f,0.0f };
+		
 
 	}
 
+	
 	//DescriptorSizeを所得しておく
 	const uint32_t desriptorSizeSRV = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
@@ -1455,9 +1488,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		transforms[index].translate = { index * 0.1f,index * 0.1f,index * 0.1f };
 	}
 
-
+	//△tを定義。とりあえず60fps固定してあるが、実時間を計測して可変fpsで動かせるようにしておくとなお良い
+	const float kDeletaTime = 1.0f / 60.0f;
 	//------------------------------------------------------------------------------------------------------------------------------
-
+	//メインループ
 	MSG msg{};
 	//ウィンドウの×ボタンが押されるまでループ
 	while (msg.message != WM_QUIT)
@@ -1483,7 +1517,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			ImGui_ImplWin32_NewFrame();
 			ImGui::NewFrame();
 
-
+			
 
 
 			Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
@@ -1513,13 +1547,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 			Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
 
+
+
 			//WVP等を計算
 			for (uint32_t index = 0; index < kNumInstance; ++index) {
+				particles[index].transform.translate += particles[index].velocity * kDeletaTime;
+
 				Matrix4x4 worldMatrix =
 					MakeAffineMatrix(transforms[index].scale, transforms[index].rotate, transforms[index].translate);
 				Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, viewProjectionMatrix);
 				instancingData[index].WVP = worldViewProjectionMatrix;
 				instancingData[index].World = worldMatrix;
+
 			}
 
 
