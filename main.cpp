@@ -13,6 +13,7 @@
 #include"externals/DirectXTex/DirectXTex.h"
 #include<fstream>
 #include<sstream>
+#include<random>
 #include"externals/DirectXTex/d3dx12.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -64,7 +65,7 @@ struct Transform {
 	Vector3 translate;
 };
 
-struct TransformationMatrix{
+struct TransformationMatrix {
 	Matrix4x4 WVP;
 	Matrix4x4 World;
 };
@@ -89,6 +90,14 @@ struct Particle {
 
 };
 
+//Vector３の足算
+Vector3& operator+=(Vector3& lhv, const Vector3& rhv) {
+	lhv.x += rhv.x;
+	lhv.y += rhv.y;
+	lhv.z += rhv.z;
+	return lhv;
+}
+
 //Vector３の掛け算
 Vector3& operator*=(Vector3& v, float s) {
 	v.x *= s;
@@ -99,8 +108,7 @@ Vector3& operator*=(Vector3& v, float s) {
 
 const Vector3 operator*(const Vector3& v, float s) {
 	Vector3 temp(v);
-	return temp *=s;
-
+	return temp *= s;
 }
 
 // 単位行列
@@ -592,14 +600,14 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 			modelData.material = LoadMaterialTemplateFile(directoryPath, materialFilename);
 
 		}
-		
+
 	}
 	//４，ModelDataを返す
 	return modelData;
-	
+
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandle(ID3D12DescriptorHeap* descriptorHeap,uint32_t descriptorSize,uint32_t index)
+D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandle(ID3D12DescriptorHeap* descriptorHeap, uint32_t descriptorSize, uint32_t index)
 {
 	D3D12_CPU_DESCRIPTOR_HANDLE handleCPU = descriptorHeap->GetCPUDescriptorHandleForHeapStart();
 	handleCPU.ptr += (descriptorSize * index);
@@ -807,7 +815,21 @@ ID3D12Resource* CreateBufferResource(ID3D12Device* device, size_t sizeInBytes)
 	return vertexResource;
 }
 
+//乱数生成器の初期化
+std::random_device seedGenerator;
+std::mt19937 randomEngine(seedGenerator());
+//一様分布生成器を使って乱数を生成
+std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
 
+
+Particle MakeNewParticle(std::mt19937& randomEngine) {
+	Particle particle;
+	particle.transform.scale = {1.0f,1.0f,1.0f};
+	particle.transform.rotate = { 0.0f,0.0f,0.0f };
+	particle.transform.translate = { distribution(randomEngine),distribution(randomEngine),distribution(randomEngine) };
+	particle.velocity = { distribution(randomEngine),distribution(randomEngine),distribution(randomEngine) };
+	return particle;
+}
 
 
 //ウィンメイン
@@ -1051,7 +1073,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	descriptorRangeForInstancing[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;//SRV使う
 	descriptorRangeForInstancing[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-	
+
 
 
 
@@ -1450,19 +1472,29 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	//}
 
+	
+
+	
+
+	////Particleの作成
 	Particle particles[kNumInstance];
+	for (uint32_t index = 0; index < kNumInstance; ++index) {
+		particles[index].transform.scale = { 1.0f,1.0f,1.0f };
+		particles[index].transform.rotate = { 0.0f,0.0f,0.0f };
+		particles[index].transform.translate = { index * 0.1f,index * 0.1f,index * 0.1f };
+	}
 
 	//単位行列を書きこんでおく
 	for (uint32_t index = 0; index < kNumInstance; ++index) {
 		instancingData[index].WVP = MakeIdentity4x4();
 		instancingData[index].World = MakeIdentity4x4();
+		//位置と速度を{-1,1,}でランダムに初期化
+		particles[index].transform.translate = { distribution(randomEngine),distribution(randomEngine),distribution(randomEngine) };
 		//速度を上向きに設定
-		particles[index].velocity = { 0.0f,1.0f,0.0f };
-		
-
+		particles[index].velocity = { distribution(randomEngine),distribution(randomEngine),distribution(randomEngine)};
 	}
 
-	
+
 	//DescriptorSizeを所得しておく
 	const uint32_t desriptorSizeSRV = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
@@ -1476,17 +1508,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	instancingSrvDesc.Buffer.NumElements = kNumInstance;
 	instancingSrvDesc.Buffer.StructureByteStride = sizeof(TransformationMatrix);
 	D3D12_CPU_DESCRIPTOR_HANDLE instancingSrvHandleCPU = GetCPUDescriptorHandle(srvDescriptorHeap, desriptorSizeSRV, 3);
-	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU = GetGPUDescriptorHandle(srvDescriptorHeap,desriptorSizeSRV, 3);
+	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU = GetGPUDescriptorHandle(srvDescriptorHeap, desriptorSizeSRV, 3);
 	device->CreateShaderResourceView(instancingResource.Get(), &instancingSrvDesc, instancingSrvHandleCPU);
 
 
-	//Transformの作成
-	Transform transforms[kNumInstance];
-	for(uint32_t index = 0;index < kNumInstance; ++ index){
-		transforms[index].scale = { 1.0f,1.0f,1.0f };
-		transforms[index].rotate = { 0.0f,0.0f,0.0f };
-		transforms[index].translate = { index * 0.1f,index * 0.1f,index * 0.1f };
-	}
+	
+	
+
+
 
 	//△tを定義。とりあえず60fps固定してあるが、実時間を計測して可変fpsで動かせるようにしておくとなお良い
 	const float kDeletaTime = 1.0f / 60.0f;
@@ -1517,7 +1546,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			ImGui_ImplWin32_NewFrame();
 			ImGui::NewFrame();
 
-			
+
 
 
 			Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
@@ -1554,11 +1583,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 				particles[index].transform.translate += particles[index].velocity * kDeletaTime;
 
 				Matrix4x4 worldMatrix =
-					MakeAffineMatrix(transforms[index].scale, transforms[index].rotate, transforms[index].translate);
+					MakeAffineMatrix(particles[index].transform.scale, particles[index].transform.rotate, particles[index].transform.translate);
 				Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, viewProjectionMatrix);
 				instancingData[index].WVP = worldViewProjectionMatrix;
 				instancingData[index].World = worldMatrix;
-
+				
 			}
 
 
