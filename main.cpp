@@ -87,7 +87,7 @@ struct ModelData
 struct Particle {
 	Transform transform;
 	Vector3 velocity;
-
+	Vector4 color;
 };
 
 //Vector３の足算
@@ -821,13 +821,18 @@ std::mt19937 randomEngine(seedGenerator());
 //一様分布生成器を使って乱数を生成
 std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
 
+std::uniform_real_distribution<float> distColor(0.0f, 1.0f);
+
+
 
 Particle MakeNewParticle(std::mt19937& randomEngine) {
+	std::uniform_real_distribution<float>distribution(-1.0f, 1.0f);
 	Particle particle;
-	particle.transform.scale = {1.0f,1.0f,1.0f};
+	particle.transform.scale = { 1.0f,1.0f,1.0f };
 	particle.transform.rotate = { 0.0f,0.0f,0.0f };
 	particle.transform.translate = { distribution(randomEngine),distribution(randomEngine),distribution(randomEngine) };
 	particle.velocity = { distribution(randomEngine),distribution(randomEngine),distribution(randomEngine) };
+	particle.color = { distColor(randomEngine),distColor(randomEngine),distColor(randomEngine),1.0f};
 	return particle;
 }
 
@@ -1472,16 +1477,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	//}
 
-	
 
-	
+
+
 
 	////Particleの作成
 	Particle particles[kNumInstance];
 	for (uint32_t index = 0; index < kNumInstance; ++index) {
-		particles[index].transform.scale = { 1.0f,1.0f,1.0f };
-		particles[index].transform.rotate = { 0.0f,0.0f,0.0f };
-		particles[index].transform.translate = { index * 0.1f,index * 0.1f,index * 0.1f };
+		particles[index] = MakeNewParticle(randomEngine);
 	}
 
 	//単位行列を書きこんでおく
@@ -1491,7 +1494,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		//位置と速度を{-1,1,}でランダムに初期化
 		particles[index].transform.translate = { distribution(randomEngine),distribution(randomEngine),distribution(randomEngine) };
 		//速度を上向きに設定
-		particles[index].velocity = { distribution(randomEngine),distribution(randomEngine),distribution(randomEngine)};
+		particles[index].velocity = { distribution(randomEngine),distribution(randomEngine),distribution(randomEngine) };
 	}
 
 
@@ -1512,8 +1515,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	device->CreateShaderResourceView(instancingResource.Get(), &instancingSrvDesc, instancingSrvHandleCPU);
 
 
-	
-	
+
+
 
 
 
@@ -1587,7 +1590,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 				Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, viewProjectionMatrix);
 				instancingData[index].WVP = worldViewProjectionMatrix;
 				instancingData[index].World = worldMatrix;
-				
+
 			}
 
 
