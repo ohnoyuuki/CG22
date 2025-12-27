@@ -61,6 +61,18 @@ struct Transform {
 	Vector3 translate;
 };
 
+struct  Material{
+	Vector4 color;
+	int32_t enableLighting;
+};
+
+
+
+
+
+
+//------------------------------------
+
 // 単位行列
 Matrix4x4 MakeIdentity4x4() {
 	Matrix4x4 identity;
@@ -1170,13 +1182,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 
 	//マテリアル用のリソースを作る。今回はcolor１つ分のサイズを用意する
-	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4));
+	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Material));
 	//マテリアルにデータを書き込む
-	Vector4* materialData = nullptr;
+	Material* materialData = nullptr;
 	//書き込むためのアドレスを取得
 	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
-	//今回は白を書き込んでみる
-	*materialData = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+	//マテリアルの内容
+	materialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+	materialData->enableLighting = true;
 
 	// wvp用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
 	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(Matrix4x4));
@@ -1321,6 +1334,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	bool useMonsterBall = true;
 
 
+	//--------------------------------------------------------------------------------------------------------
+
+	//スプライトのマテリアル用のリソースを作る。今回はcolor１つ分のサイズを用意する
+	ID3D12Resource* materialResourceSprite = CreateBufferResource(device,sizeof(Material));
+	//スプライトのマテリアルにデータを書き込む
+	Material* materialDataSprite = nullptr;
+	//書き込むためのアドレスを取得
+	materialResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&materialDataSprite));
+	//色は白、ライトは無し
+	materialDataSprite->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+	materialDataSprite->enableLighting = false;
+
+
+
+
 	//------------------------------------------------------------------------------------------------------------------------------
 
 	MSG msg{};
@@ -1362,7 +1390,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			ImGui::ShowDemoWindow();
 
 			ImGui::Begin("Settings");
-			ImGui::ColorEdit4("material", &materialData->x, ImGuiColorEditFlags_AlphaPreview);//RGBWの指定
+			ImGui::ColorEdit4("material", &materialData->color.x, ImGuiColorEditFlags_AlphaPreview);//RGBWの指定
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
 			ImGui::End();
 
@@ -1432,6 +1460,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 			//Spriteの描画。変更が必要なものだけ変更
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
+			//マテリアルCBufferの場所を設定
+			commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
 			//TransformationMatrixCBufferの場所を設定
 			commandList->SetGraphicsRootConstantBufferView(1, transformtionMatirxResourceSprite->GetGPUVirtualAddress());
 			//テクスチャ
@@ -1532,6 +1562,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	ImGui_ImplDX12_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
+
+	materialResourceSprite->Release();
 
 	dsvDescriptorHeap->Release();
 	depthStencilResource->Release();
