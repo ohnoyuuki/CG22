@@ -67,7 +67,11 @@ struct  Material{
 };
 
 
+struct TransformationMatrix {
+	Matrix4x4 WVP;
+	Matrix4x4 World;
 
+};
 
 
 
@@ -1192,13 +1196,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	materialData->enableLighting = true;
 
 	// wvp用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
-	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(Matrix4x4));
+	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(TransformationMatrix));
 	// データを書き込む
-	Matrix4x4* wvpData = nullptr;
+	TransformationMatrix* wvpData = nullptr;
 	// 書き込むためのアドレスを取得
 	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
 	// 単位行列を書き込んでおく
-	*wvpData = MakeIdentity4x4();
+	wvpData->WVP = MakeIdentity4x4();
+	wvpData->World = MakeIdentity4x4();
+
 
 	Transform transform{
 	  {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
@@ -1319,13 +1325,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 
 	//Sparite用のTransformationMatrix用のリソースを作る。Matrix4x4 １つ分のサイズを用意する
-	ID3D12Resource* transformtionMatirxResourceSprite = CreateBufferResource(device, sizeof(Matrix4x4));
+	ID3D12Resource* transformationMatirxResourceSprite = CreateBufferResource(device, sizeof(TransformationMatrix));
 	//データを書き込む
-	Matrix4x4* transformationMatrixDataSprite = nullptr;
+	TransformationMatrix* transformationMatrixDataSprite = nullptr;
 	//書き込むためのアドレスを取得
-	transformtionMatirxResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite));
+	transformationMatirxResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite));
 	//単位行列を書きこんでおく
-	*transformationMatrixDataSprite = MakeIdentity4x4();
+	transformationMatrixDataSprite->WVP = MakeIdentity4x4();
+	transformationMatrixDataSprite->World = MakeIdentity4x4();
 
 	//CPUで動かす用のTransformを作る
 	Transform transformSprite{ {1.0f,1.0f,1.0f},{ 0.0f,0.0f,0.0f },{0.0f,0.0f,0.0f} };
@@ -1364,13 +1371,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		{
 			//ゲームの処理
 
-			//Sprite用のWorldViewProjectionMatrixを作る
-			Matrix4x4 worldMatrixSprite = MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
-			Matrix4x4 viewMatrixSprite = MakeIdentity4x4();
-			Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(0.0f, 0.0f, float(kClientWidth), float(kClientHeight), 0.0f, 100.0f);
-			Matrix4x4 worldViewProjectionMatrixSprite = Multiply(worldMatrixSprite, Multiply(viewMatrixSprite, projectionMatrixSprite));
-			*transformationMatrixDataSprite = worldViewProjectionMatrixSprite;
-
+			
 			//フレームが始まる旨を告げる
 			ImGui_ImplDX12_NewFrame();
 			ImGui_ImplWin32_NewFrame();
@@ -1384,7 +1385,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			Matrix4x4 viewMatrix = Inverse(cameraMatrix);
 			Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
 			Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
-			*wvpData = worldViewProjectionMatrix;
+			wvpData->WVP = worldViewProjectionMatrix;
+			wvpData->World = worldMatrix;
+
+			//Sprite用のWorldViewProjectionMatrixを作る
+			Matrix4x4 worldMatrixSprite = MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
+			Matrix4x4 viewMatrixSprite = MakeIdentity4x4();
+			Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(0.0f, 0.0f, float(kClientWidth), float(kClientHeight), 0.0f, 100.0f);
+			Matrix4x4 worldViewProjectionMatrixSprite = Multiply(worldMatrixSprite, Multiply(viewMatrixSprite, projectionMatrixSprite));
+			transformationMatrixDataSprite->WVP = worldViewProjectionMatrix;
+			transformationMatrixDataSprite->World = worldMatrix;
+
 
 			//開発用UIの処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
 			ImGui::ShowDemoWindow();
@@ -1463,7 +1474,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//マテリアルCBufferの場所を設定
 			commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
 			//TransformationMatrixCBufferの場所を設定
-			commandList->SetGraphicsRootConstantBufferView(1, transformtionMatirxResourceSprite->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootConstantBufferView(1, transformationMatirxResourceSprite->GetGPUVirtualAddress());
 			//テクスチャ
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 
