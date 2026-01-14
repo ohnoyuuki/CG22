@@ -1002,7 +1002,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	inputElementDescs[2].SemanticName = "NORMAL";
 	inputElementDescs[2].SemanticIndex = 0;
-	inputElementDescs[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+	inputElementDescs[2].Format = DXGI_FORMAT_R32G32_FLOAT;
 	inputElementDescs[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 
 
@@ -1395,6 +1395,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//SRVを切り替える
 	bool useMonsterBall = true;
 
+	bool showSprite = false;
+
 	//------------------------------------------------------------------------------------------------------------------------------
 
 	MSG msg{};
@@ -1443,6 +1445,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			ImGui::ColorEdit4("material", &materialData->color.x, ImGuiColorEditFlags_AlphaPreview);//RGBWの指定
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
 			ImGui::DragFloat3("light",&directionalLightData->direction.x,0.01f,-1.0f,1.0f);
+			ImGui::Checkbox("Show Sprite", &showSprite);
 			ImGui::End();
 
 			//方向は正規化
@@ -1495,6 +1498,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			//RootSignatureを設定。PSOに設定しているけど別途設定が必要
 			commandList->SetGraphicsRootSignature(rootSignature);
 			commandList->SetPipelineState(graphicsPipelineState);//PSOを設定
+
+
+
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferView);//VBVを設定
 			//形状を設定。PSOに設定しているものとはまた別。同じものを設定すると考えておけばいいい
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -1517,19 +1523,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 			//--------------------------------------
 
-			//Spriteの描画。変更が必要なものだけ変更
-			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
-			//マテリアルCBufferの場所を設定
-			commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
-			//TransformationMatrixCBufferの場所を設定
-			commandList->SetGraphicsRootConstantBufferView(1, transformationMatirxResourceSprite->GetGPUVirtualAddress());
-			//テクスチャ
-			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
+			if (showSprite) {
 
-			//描画！（DrawInstanced(DrawCall/ドローコル）
-			commandList->DrawInstanced(6, 1, 0, 0);
+				//Spriteの描画。変更が必要なものだけ変更
+				commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
+				//マテリアルCBufferの場所を設定
+				commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
+				//TransformationMatrixCBufferの場所を設定
+				commandList->SetGraphicsRootConstantBufferView(1, transformationMatirxResourceSprite->GetGPUVirtualAddress());
+				//テクスチャ
+				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 
+				//描画！（DrawInstanced(DrawCall/ドローコル）
+				commandList->DrawInstanced(6, 1, 0, 0);
 
+			}
 
 			//実際のcommandListのImGuiの描画コマンドを積む
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
