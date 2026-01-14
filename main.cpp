@@ -349,6 +349,25 @@ Matrix4x4 MakeOrthographicMatrix(float left, float top, float right, float botto
 }
 
 
+//正規化の数学系関数--------------------------------------------------------------------------------
+//内積
+float Dot(const Vector3& v1, const Vector3& v2) {return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;}
+
+//長さ
+float Length(const Vector3& v) { return std::sqrt(Dot(v, v)); }
+
+//正規化
+Vector3 Normalize(const Vector3& v) {
+	float length = Length(v);
+	if (length == 0.0f) {
+		return v;
+
+	}
+	return { v.x / length,v.y / length,v.z / length };
+
+}
+
+//--------------------------------------------------------------------------------------------------
 
 //DescriptorHeapの作成関数
 ID3D12DescriptorHeap* CreateDescriptorHeap(
@@ -1423,7 +1442,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			ImGui::Begin("Settings");
 			ImGui::ColorEdit4("material", &materialData->color.x, ImGuiColorEditFlags_AlphaPreview);//RGBWの指定
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
+			ImGui::DragFloat3("light",&directionalLightData->direction.x,0.01f,-1.0f,1.0f);
 			ImGui::End();
+
+			//方向は正規化
+			directionalLightData->direction = Normalize(directionalLightData->direction);
+
+
 
 			//ImGuiの内部コマンドを生成する
 			ImGui::Render();
